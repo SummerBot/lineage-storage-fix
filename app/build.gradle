@@ -1,10 +1,15 @@
-plugins {
-    id 'com.android.application'
-}
-
 android {
     namespace 'io.github.summerbot.lineagestoragefix'
     compileSdk 34
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("SIGNING_KEYSTORE_FILE") ?: "keystore/release.jks")
+            storePassword System.getenv("SIGNING_STORE_PASSWORD")
+            keyAlias System.getenv("SIGNING_KEY_ALIAS")
+            keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+        }
+    }
 
     defaultConfig {
         applicationId 'io.github.summerbot.lineagestoragefix'
@@ -22,6 +27,7 @@ android {
         }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -36,8 +42,4 @@ android {
             excludes += ['/META-INF/{AL2.0,LGPL2.1}']
         }
     }
-}
-
-dependencies {
-    compileOnly 'de.robv.android.xposed:api:82'
 }
