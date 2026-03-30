@@ -17,7 +17,7 @@
 
         <meta-data
             android:name="xposeddescription"
-            android:value="Fix Storage page total/used values by reading real filesystem size." />
+            android:value="@string/app_description" />
     </application>
 
 </manifest>
