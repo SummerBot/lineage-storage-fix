@@ -1,3 +1,7 @@
+plugins {
+    id 'com.android.application'
+}
+
 android {
     namespace 'io.github.summerbot.lineagestoragefix'
     compileSdk 34
@@ -42,4 +46,8 @@ android {
             excludes += ['/META-INF/{AL2.0,LGPL2.1}']
         }
     }
+}
+
+dependencies {
+    compileOnly 'de.robv.android.xposed:api:82'
 }
