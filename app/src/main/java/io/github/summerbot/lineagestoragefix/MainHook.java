@@ -1,9 +1,9 @@
 package io.github.summerbot.lineagestoragefix;
 
-import android.app.usage.StorageStatsManager;
+import android.os.Environment;
 
 import java.io.File;
-import java.lang.reflect.Method;
+import java.util.UUID;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -13,8 +13,6 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class MainHook implements IXposedHookLoadPackage {
     private static final String TARGET_PACKAGE = "com.android.settings";
-    private static final String TARGET_CLASS =
-            "com.android.settingslib.deviceinfo.StorageManagerVolumeProvider";
 
     @Override
     public void handleLoadPackage(final XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
@@ -25,51 +23,56 @@ public class MainHook implements IXposedHookLoadPackage {
         XposedBridge.log("LineageStorageFix: loaded into " + lpparam.packageName);
 
         try {
-            Class<?> providerClass = XposedHelpers.findClass(TARGET_CLASS, lpparam.classLoader);
+            final File dataDir = Environment.getDataDirectory();
 
-            // VolumeInfo is a hidden framework class; resolve it at runtime
-            Class<?> volumeInfoClass = XposedHelpers.findClass(
-                    "android.os.storage.VolumeInfo",
-                    null
-            );
-
+            // Hook StorageStatsManager.getTotalBytes(UUID)
             XposedHelpers.findAndHookMethod(
-                    providerClass,
+                    "android.app.usage.StorageStatsManager",
+                    null,
                     "getTotalBytes",
-                    StorageStatsManager.class,
-                    volumeInfoClass,
+                    UUID.class,
                     new XC_MethodHook() {
                         @Override
-                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                            Object volume = param.args[1];
-                            File path = resolvePath(volume);
-                            if (path != null) {
-                                long total = path.getTotalSpace();
-                                if (total > 0L) {
-                                    XposedBridge.log("LineageStorageFix: total=" + total + " path=" + path);
-                                    param.setResult(total);
-                                }
+                        protected void beforeHookedMethod(MethodHookParam param) {
+                            long total = dataDir.getTotalSpace();
+                            if (total > 0L) {
+                                XposedBridge.log("LineageStorageFix: getTotalBytes -> " + total);
+                                param.setResult(total);
                             }
                         }
                     }
             );
 
+            // Hook StorageStatsManager.getFreeBytes(UUID)
             XposedHelpers.findAndHookMethod(
-                    providerClass,
+                    "android.app.usage.StorageStatsManager",
+                    null,
                     "getFreeBytes",
-                    StorageStatsManager.class,
-                    volumeInfoClass,
+                    UUID.class,
                     new XC_MethodHook() {
                         @Override
-                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                            Object volume = param.args[1];
-                            File path = resolvePath(volume);
-                            if (path != null) {
-                                long free = path.getUsableSpace();
-                                if (free >= 0L) {
-                                    XposedBridge.log("LineageStorageFix: free=" + free + " path=" + path);
-                                    param.setResult(free);
-                                }
+                        protected void beforeHookedMethod(MethodHookParam param) {
+                            long free = dataDir.getUsableSpace();
+                            if (free >= 0L) {
+                                XposedBridge.log("LineageStorageFix: getFreeBytes -> " + free);
+                                param.setResult(free);
+                            }
+                        }
+                    }
+            );
+
+            // Hook com.android.settings.Utils.getPrimaryStorageSize()
+            XposedHelpers.findAndHookMethod(
+                    "com.android.settings.Utils",
+                    lpparam.classLoader,
+                    "getPrimaryStorageSize",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) {
+                            long total = dataDir.getTotalSpace();
+                            if (total > 0L) {
+                                XposedBridge.log("LineageStorageFix: getPrimaryStorageSize -> " + total);
+                                param.setResult(total);
                             }
                         }
                     }
@@ -80,23 +83,5 @@ public class MainHook implements IXposedHookLoadPackage {
             XposedBridge.log("LineageStorageFix: failed to install hooks");
             XposedBridge.log(t);
         }
-    }
-
-    private static File resolvePath(Object volume) {
-        if (volume == null) {
-            return null;
-        }
-
-        try {
-            Method getPath = volume.getClass().getMethod("getPath");
-            Object result = getPath.invoke(volume);
-            if (result instanceof File) {
-                return (File) result;
-            }
-        } catch (Throwable t) {
-            XposedBridge.log("LineageStorageFix: resolvePath failed: " + t);
-        }
-
-        return null;
     }
 }
